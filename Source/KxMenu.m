@@ -60,23 +60,21 @@ const CGFloat kArrowSize = 12.f;
     if (self) {
         self.backgroundColor = [UIColor clearColor];
         self.opaque = NO;
-        
-        UITapGestureRecognizer *gestureRecognizer;
-        gestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                    action:@selector(singleTap:)];
-        [self addGestureRecognizer:gestureRecognizer];
     }
     return self;
 }
 
-// thank horaceho https://github.com/horaceho
-// for his solution described in https://github.com/kolyvan/kxmenu/issues/9
-
-- (void)singleTap:(UITapGestureRecognizer *)recognizer
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    for (UIView *v in self.subviews) {
-        if ([v isKindOfClass:[KxMenuView class]] && [v respondsToSelector:@selector(dismissMenu:)]) {
-            [v performSelector:@selector(dismissMenu:) withObject:@(YES)];
+    UIView *touched = [[touches anyObject] view];
+    if (touched == self) {
+        
+        for (UIView *v in self.subviews) {
+            if ([v isKindOfClass:[KxMenuView class]]
+                && [v respondsToSelector:@selector(dismissMenu:)]) {
+                
+                [v performSelector:@selector(dismissMenu:) withObject:@(YES)];
+            }
         }
     }
 }
@@ -158,6 +156,7 @@ typedef enum {
     CGFloat                     _arrowPosition;
     UIView                      *_contentView;
     NSArray                     *_menuItems;
+    BOOL                        _isHidden;
 }
 
 - (id)init
@@ -172,6 +171,7 @@ typedef enum {
         self.layer.shadowOpacity = 0.5;
         self.layer.shadowOffset = CGSizeMake(2, 2);
         self.layer.shadowRadius = 2;
+        _isHidden = YES;
     }
     
     return self;
@@ -308,13 +308,14 @@ typedef enum {
             (outerHeight - contentSize.height) * 0.5f,
             contentSize,
         };
-    }    
+    }
 }
 
 - (void)showMenuInView:(UIView *)view
               fromRect:(CGRect)rect
              menuItems:(NSArray *)menuItems
 {
+    _isHidden = NO;
     _menuItems = menuItems;
     
     _contentView = [self mkContentView];
@@ -330,7 +331,7 @@ typedef enum {
     const CGRect toFrame = self.frame;
     self.frame = (CGRect){self.arrowPoint, 1, 1};
     
-    [UIView animateWithDuration:0.2
+    [UIView animateWithDuration:0
                      animations:^(void) {
                          
                          self.alpha = 1.0f;
@@ -342,16 +343,22 @@ typedef enum {
    
 }
 
+- (void) updateContentView {
+    _contentView.hidden = YES;
+}
+
+
+
 - (void)dismissMenu:(BOOL) animated
 {
     if (self.superview) {
-     
+        
         if (animated) {
             
             _contentView.hidden = YES;            
             const CGRect toFrame = (CGRect){self.arrowPoint, 1, 1};
             
-            [UIView animateWithDuration:0.2
+            [UIView animateWithDuration:0
                              animations:^(void) {
                                  
                                  self.alpha = 0;
@@ -370,11 +377,13 @@ typedef enum {
                 [self.superview removeFromSuperview];
             [self removeFromSuperview];
         }
+        _isHidden = YES;
     }
 }
 
 - (void)performAction:(id)sender
 {
+    
     [self dismissMenu:YES];
     
     UIButton *button = (UIButton *)sender;
@@ -410,17 +419,13 @@ typedef enum {
             maxImageWidth = imageSize.width;        
     }
     
-    if (maxImageWidth) {
-        maxImageWidth += kMarginX;
-    }
-    
     for (KxMenuItem *menuItem in _menuItems) {
 
-        const CGSize titleSize = [menuItem.title sizeWithFont:titleFont];
+        const CGSize titleSize = [menuItem.title sizeWithAttributes:[NSDictionary dictionaryWithObjectsAndKeys:titleFont, NSFontAttributeName, nil]];
         const CGSize imageSize = menuItem.image.size;
 
         const CGFloat itemHeight = MAX(titleSize.height, imageSize.height) + kMarginY * 2;
-        const CGFloat itemWidth = ((!menuItem.enabled && !menuItem.image) ? titleSize.width : maxImageWidth + titleSize.width) + kMarginX * 4;
+        const CGFloat itemWidth = (menuItem.image ? maxImageWidth + kMarginX : 0) + titleSize.width + kMarginX * 4;
         
         if (itemHeight > maxItemHeight)
             maxItemHeight = itemHeight;
@@ -432,8 +437,8 @@ typedef enum {
     maxItemWidth  = MAX(maxItemWidth, kMinMenuItemWidth);
     maxItemHeight = MAX(maxItemHeight, kMinMenuItemHeight);
 
-    const CGFloat titleX = kMarginX * 2 + maxImageWidth;
-    const CGFloat titleWidth = maxItemWidth - titleX - kMarginX * 2;
+    const CGFloat titleX = kMarginX * 2 + (maxImageWidth > 0 ? maxImageWidth + kMarginX : 0);
+    const CGFloat titleWidth = maxItemWidth - titleX - kMarginX;
     
     UIImage *selectedImage = [KxMenuView selectedImage:(CGSize){maxItemWidth, maxItemHeight + 2}];
     UIImage *gradientLine = [KxMenuView gradientLine: (CGSize){maxItemWidth - kMarginX * 4, 1}];
@@ -452,7 +457,8 @@ typedef enum {
         
         UIView *itemView = [[UIView alloc] initWithFrame:itemFrame];
         itemView.autoresizingMask = UIViewAutoresizingNone;
-        itemView.backgroundColor = [UIColor clearColor];        
+//        itemView.backgroundColor = [UIColor clearColor];
+        itemView.backgroundColor = menuItem.bgColor;
         itemView.opaque = NO;
                 
         [contentView addSubview:itemView];
@@ -528,7 +534,7 @@ typedef enum {
             gradientView.contentMode = UIViewContentModeLeft;
             [itemView addSubview:gradientView];
             
-            itemY += 2;
+            itemY += 1;
         }
         
         itemY += maxItemHeight;
@@ -624,8 +630,8 @@ typedef enum {
 - (void)drawBackground:(CGRect)frame
              inContext:(CGContextRef) context
 {
-    CGFloat R0 = 0.267, G0 = 0.303, B0 = 0.335;
-    CGFloat R1 = 0.040, G1 = 0.040, B1 = 0.040;
+    CGFloat R0 = 0.60, G0 = 0.60, B0 = 0.60;
+    CGFloat R1 = 0.60, G1 = 0.60, B1 = 0.60;
     
     UIColor *tintColor = [KxMenu tintColor];
     if (tintColor) {
@@ -759,6 +765,9 @@ typedef enum {
     CGGradientRelease(gradient);    
 }
 
+- (BOOL) isHidden {
+    return _isHidden;
+}
 @end
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -772,6 +781,7 @@ static UIFont *gTitleFont;
     
     KxMenuView *_menuView;
     BOOL        _observing;
+
 }
 
 + (instancetype) sharedMenu
@@ -823,17 +833,15 @@ static UIFont *gTitleFont;
                                                      name:UIApplicationWillChangeStatusBarOrientationNotification
                                                    object:nil];
     }
-
-    
     _menuView = [[KxMenuView alloc] init];
-    [_menuView showMenuInView:view fromRect:rect menuItems:menuItems];    
+    [_menuView showMenuInView:view fromRect:rect menuItems:menuItems];
 }
 
 - (void) dismissMenu
 {
     if (_menuView) {
         
-        [_menuView dismissMenu:NO];
+        [_menuView dismissMenu:YES];
         _menuView = nil;
     }
     
@@ -885,4 +893,21 @@ static UIFont *gTitleFont;
     }
 }
 
++ (void) updateContentView {
+    [[self sharedMenu] updateContentView];
+}
+
+- (BOOL) isHidden {
+    if (_menuView == Nil) {
+        return YES;
+    }
+    else {
+        
+        return [_menuView isHidden];
+    }
+}
+
++ (BOOL) isHidden {
+    return [[self sharedMenu] isHidden];
+}
 @end
