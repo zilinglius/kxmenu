@@ -20,9 +20,7 @@ Pod::Spec.new do |s|
 
   s.source       = { :git => "https://github.com/zilinglius/kxmenu.git", :tag => "1.0.1" }
 
-  s.source_files  = "Classes", "Classes/**/*.{h,m}"
-  s.exclude_files = "Classes/Exclude"
-  
+  s.source_files  = "LICENSE", "readme.md", "Source/*.{h,m}"
   s.requires_arc = true
 
 end
